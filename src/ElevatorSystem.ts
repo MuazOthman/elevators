@@ -7,6 +7,12 @@ export type ElevatorSystemState = {
   floorCount: number;
   elevatorsCurrentFloors: { id: number; floor: number }[];
   time: number;
+  requests: ElevatorRequest[];
+};
+
+export type ElevatorRequest = {
+  floor: number;
+  direction: TravelDirection;
 };
 
 /**
@@ -16,6 +22,7 @@ export class ElevatorSystem {
   public static VERBOSE = true;
   public logger = new Logger();
   private _elevators: Elevator[];
+  private _requests: ElevatorRequest[] = [];
   private readonly _floorCount: number;
   private _time = 0;
   /**
@@ -48,6 +55,7 @@ export class ElevatorSystem {
       const e = state.elevatorsCurrentFloors[i];
       result._elevators[i] = new Elevator(e.id, state.floorCount, result._log, e.floor);
     }
+    result._requests = [...state.requests];
     return result;
   }
 
@@ -55,18 +63,18 @@ export class ElevatorSystem {
    * Simulates a passenger requesting an elevator from a specific floor.
    * @param toFloor The floor from which the passenger is requesting the elevator.
    * @param direction The expressed travel direction: Up or Down.
-   * @returns A reference to the elevator car that'll fulfill the request.
    */
-  callElevator(toFloor: number, direction: TravelDirection): Elevator {
+  callElevator(toFloor: number, direction: TravelDirection): void {
     this._log(`System: calling elevator to floor ${toFloor}`);
-    const costs = this._elevators.map((elevator) => ({
-      elevator,
-      cost: elevator.getCostToCall(toFloor, direction),
-    }));
-    costs.sort((a, b) => a.cost - b.cost);
-    this._log(`System: best option is elevator ${costs[0].elevator.id}`);
-    costs[0].elevator.goToFloor(toFloor);
-    return costs[0].elevator;
+    this._requests.push({ floor: toFloor, direction });
+  }
+
+  goToFloor(elevatorId: number, toFloor: number): void {
+    const elevator = this._elevators.find((e) => e.id === elevatorId);
+    if (!elevator) {
+      throw new Error(`No elevator was found with elevatorId ${elevatorId}`);
+    }
+    elevator.goToFloor(toFloor);
   }
 
   get currentTime(): number {
@@ -74,7 +82,7 @@ export class ElevatorSystem {
   }
 
   get currentElevatorFloors(): string[] {
-    return this._elevators.map((e) => `${e.id}:${e.currentFloor}`);
+    return this._elevators.map((e) => `${e.id}:${e.currentFloor}${Logger.directionSymbol(e.travelDirection)}`);
   }
 
   get currentState(): ElevatorSystemState {
@@ -82,7 +90,12 @@ export class ElevatorSystem {
       elevatorsCurrentFloors: this._elevators.map((e) => ({ id: e.id, floor: e.currentFloor })),
       floorCount: this._floorCount,
       time: this._time,
+      requests: [...this._requests],
     };
+  }
+
+  get requests(): ElevatorRequest[] {
+    return [...this._requests];
   }
 
   private readonly _log = (s: string) => {
@@ -101,6 +114,22 @@ export class ElevatorSystem {
 
       for (let i = 0; i < this._elevators.length; i++) {
         this._elevators[i].tick();
+      }
+      for (let i = 0; i < this._requests.length; i++) {
+        const request = this._requests[i];
+        const costs = this._elevators.map((elevator) => ({
+          elevator,
+          cost: elevator.getCostToCall(request.floor, request.direction),
+        }));
+        costs.sort((a, b) => a.cost - b.cost);
+        if (costs[0].cost === 0) {
+          this._requests.splice(i, 1);
+          i--;
+          costs[0].elevator.hold();
+        }
+        if (costs[0].elevator.travelDirection === 'None') {
+          costs[0].elevator.moveCloserToFloor(request.floor);
+        }
       }
       this._log(`System: current status ${this.currentElevatorFloors.join(' ')}`);
     }
