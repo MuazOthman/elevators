@@ -1,2 +1,19 @@
-# elevators
-Elevator System design exercise
+# Elevators
+
+Elevator System design exercise.
+
+## Problem Statement
+
+Consider the problem of programming an elevator in a ten floor building with a single elevator. Each floor has two buttons to call the elevator to the floor to take you up or down.
+Write code to implement the following:
+
+- User interactions from outside the elevator (pressing up/down buttons)
+- User interactions from within the elevator (pressing a button for a floor)
+- The elevator moving up and down in response to user actions
+
+## Assumptions
+
+1. A1: The system can have one or more elevator cars.
+2. A2: All elevator cars can serve each floor in the building, no express cars.
+3. A3: Elevator movement management should honor the order of requests, all requests have the same priority otherwise.
+4. A4: Elevator movement management should attempt to optimize for speed (fewer movements) as long as assumption A4 is upheld.
