@@ -17,3 +17,4 @@ Write code to implement the following:
 2. A2: All elevator cars can serve each floor in the building, no express cars.
 3. A3: Elevator movement management should prioritize serving the current direction of movement.
 4. A4: Elevator movement management should attempt to optimize for quick summon (fewer movements) as long as assumption A3 is upheld.
+5. A5: The system should prioritize passenger experience over potential power savings.

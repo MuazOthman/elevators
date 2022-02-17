@@ -1,11 +1,22 @@
 import { TravelDirection } from './ElevatorSystem';
 
+export interface IElevator {
+  getTimeToFulfillRequest(toFloor: number, direction: TravelDirection): number;
+  goToFloor(toFloor: number): void;
+  get currentFloor(): number;
+  get travelDirection(): ElevatorTravelDirection;
+  get id(): number;
+  tick(): void;
+  moveCloserToFloor(floor: number): void;
+  hold(): void;
+}
+
 export type ElevatorTravelDirection = TravelDirection | 'None';
 
 /**
  * Models a single elevator car in an {@link ElevatorSystem}
  */
-export class Elevator {
+export class Elevator implements IElevator {
   public static BOARDING_TIME = 2;
   private readonly _floorCount: number;
   private readonly _id: number;
@@ -35,27 +46,26 @@ export class Elevator {
   }
 
   /**
-   * Calculates the number of floors to be traveled before this elevator can go to the specified floor.
+   * Calculates the time needed before this elevator can arrive to the specified floor.
    * The elevator will honor the current direction but will make an attempt to add a stop if possible.
-   *  the way.
    * @param toFloor Target floor.
    * @param direction Intended direction of travel after boarding.
-   * @returns The number of ticks to be traveled before this elevator can go to the specified floor.
+   * @returns The number of ticks to be spent traveling or boarding before this elevator can go to the specified floor.
    *  Every floor traveled is one tick, and every stop adds {@link Elevator.BOARDING_TIME} ticks.
    */
-  getCostToCall(toFloor: number, direction: TravelDirection): number {
+  getTimeToFulfillRequest(toFloor: number, direction: TravelDirection): number {
     if (this._travelDirection === 'None') return Math.abs(toFloor - this.currentFloor);
     let result = this._boardingCountdown;
 
     // the elevator will honor the current direction but will make an attempt to add a stop if possible
     let simulatedFloor = this.currentFloor;
-    const tryCurrentDirection = this._costInDirection(
+    const tryCurrentDirection = this._travelTimeInDirection(
       simulatedFloor,
       toFloor,
       this._travelDirection,
       this._travelDirection === direction,
     );
-    result += tryCurrentDirection.cost;
+    result += tryCurrentDirection.time;
     if (tryCurrentDirection.stopOnTheWay) {
       return result;
     }
@@ -63,13 +73,13 @@ export class Elevator {
     // the elevator will check the other direction but will make an attempt to add a stop if possible
     const otherDirection = this._travelDirection === 'Up' ? 'Down' : 'Up';
     simulatedFloor = this._lastStopForDirection(this._travelDirection) ?? this.currentFloor;
-    const tryOtherDirection = this._costInDirection(
+    const tryOtherDirection = this._travelTimeInDirection(
       simulatedFloor,
       toFloor,
       otherDirection,
       otherDirection === direction,
     );
-    result += tryOtherDirection.cost;
+    result += tryOtherDirection.time;
     if (tryOtherDirection.stopOnTheWay) {
       return result;
     }
@@ -84,26 +94,26 @@ export class Elevator {
     return jobs.length > 0 ? jobs[jobs.length - 1] : undefined;
   }
 
-  private _costInDirection(
+  private _travelTimeInDirection(
     fromFloor: number,
     toFloor: number,
     direction: TravelDirection,
     shouldAttemptToStop: boolean,
-  ): { cost: number; stopOnTheWay: boolean } {
-    let cost = 0;
+  ): { time: number; stopOnTheWay: boolean } {
+    let time = 0;
     const stops = [fromFloor, ...this._jobs[direction]];
     for (let i = 0; i < stops.length - 1; i++) {
       const lower = Math.min(stops[i], stops[i + 1]);
       const higher = Math.max(stops[i], stops[i + 1]);
       if (shouldAttemptToStop && lower >= toFloor && higher <= toFloor) {
         // can stop along the way
-        cost += Math.abs(stops[i] - toFloor);
-        return { cost, stopOnTheWay: true };
+        time += Math.abs(stops[i] - toFloor);
+        return { time: time, stopOnTheWay: true };
       }
-      cost += Math.abs(stops[i] - toFloor);
-      cost += Elevator.BOARDING_TIME;
+      time += Math.abs(stops[i] - toFloor);
+      time += Elevator.BOARDING_TIME;
     }
-    return { cost, stopOnTheWay: false };
+    return { time: time, stopOnTheWay: false };
   }
 
   /**
@@ -156,8 +166,6 @@ export class Elevator {
       if (this._boardingCountdown === 0 && this._travelDirection !== 'None') {
         // update direction
         const otherDirection = this._travelDirection === 'Up' ? 'Down' : 'Up';
-        // console.log(`otherDirection=${otherDirection}`);
-        // console.log(`this._jobs[otherDirection].length=${this._jobs[otherDirection].length}`);
         if (this._jobs[otherDirection].length === 0) {
           this._log(`out of jobs`);
           this._travelDirection = 'None';
@@ -193,6 +201,11 @@ export class Elevator {
     }
   }
 
+  /**
+   * Moves the elevator a single floor to get closer to specified floor. This is typically used to respond to elevator
+   *  calls.
+   * @param floor Floor number to move towards.
+   */
   moveCloserToFloor(floor: number): void {
     if (this._travelDirection !== 'None') return;
     if (floor === this._currentFloor) return;
@@ -201,7 +214,10 @@ export class Elevator {
     this._log(`moved ${diff > 0 ? 'up' : 'down'} a single floor closer to ${floor} to pick up a passenger`);
   }
 
-  hold() {
+  /**
+   * Resets boarding counter to allow for passenger boarding/disembarking.
+   */
+  hold(): void {
     this._boardingCountdown = Elevator.BOARDING_TIME;
     this._log(`hold requested`);
   }

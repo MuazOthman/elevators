@@ -1,6 +1,15 @@
 import { Elevator } from './Elevator';
 import { Logger } from './Logger';
 
+export interface IElevatorSystem {
+  callElevator(toFloor: number, direction: TravelDirection): void;
+  goToFloor(elevatorId: number, toFloor: number): void;
+  tick(ticks: number): void;
+  get currentTime(): number;
+  get currentState(): ElevatorSystemState;
+  get requests(): ElevatorRequest[];
+}
+
 export type TravelDirection = 'Up' | 'Down';
 
 export type ElevatorSystemState = {
@@ -18,7 +27,7 @@ export type ElevatorRequest = {
 /**
  * Models an elevator system with multiple cars in a single building.
  */
-export class ElevatorSystem {
+export class ElevatorSystem implements IElevatorSystem {
   public static VERBOSE = true;
   public logger = new Logger();
   private _elevators: Elevator[];
@@ -115,19 +124,30 @@ export class ElevatorSystem {
       for (let i = 0; i < this._elevators.length; i++) {
         this._elevators[i].tick();
       }
+
+      // try to fulfill requests
       for (let i = 0; i < this._requests.length; i++) {
         const request = this._requests[i];
         const costs = this._elevators.map((elevator) => ({
           elevator,
-          cost: elevator.getCostToCall(request.floor, request.direction),
+          cost: elevator.getTimeToFulfillRequest(request.floor, request.direction),
         }));
         costs.sort((a, b) => a.cost - b.cost);
         if (costs[0].cost === 0) {
+          // the request was fulfilled
           this._requests.splice(i, 1);
           i--;
+          // ensure that if an elevator is there it stops for the passenger to board
           costs[0].elevator.hold();
         }
         if (costs[0].elevator.travelDirection === 'None') {
+          /* When the best option (lowest waiting time) is a stationary elevator, move it 1 floor closer to the
+           * requested floor. This move is necessary in many cases like the initial request, but can end up being
+           * unneeded if a better option presents after a few ticks. The system only uses currently known information
+           * but this is a good extension point to add a heuristic based on statistics or ML to try and minimize
+           * unneeded movement. This design opted for better passenger experience at the expense of potential power
+           * savings.
+           */
           costs[0].elevator.moveCloserToFloor(request.floor);
         }
       }
