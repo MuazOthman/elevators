@@ -15,11 +15,33 @@ let sys = new ElevatorSystem(NUMBER_OF_FLOORS, NUMBER_OF_CARS);
 // sys.callElevator(8, 'Up');
 // sys.tick(20);
 
-function menu(preselectedOption?: string) {
+function useCase1() {
+  sys = new ElevatorSystem(10, 1);
+
+  // T0
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  menu('i', false);
+  sys.callElevator(3, 'Down');
+  sys.tick(1);
+
+  // T1
+  sys.callElevator(10, 'Down');
+  sys.tick(2);
+
+  // T3
+  sys.goToFloor(1, 2);
+  sys.tick(10);
+
+  // T13
+  sys.goToFloor(1, 1);
+  sys.tick(18);
+}
+
+function menu(preselectedOption?: string, recurse = true) {
   const option =
     preselectedOption ??
     readline.question(
-      'Choose an action: [T]ick, [c]all elevator to floor, [p]ress a button inside elevator, [i]nfo, [r]eset, [q]uit > ',
+      'Choose an action: [T]ick, [c]all elevator to floor, [p]ress a button inside elevator, [i]nfo, [r]eset, use case [1], [q]uit > ',
     );
   try {
     switch (option?.toLowerCase()) {
@@ -94,6 +116,9 @@ function menu(preselectedOption?: string) {
           }
         }
         break;
+      case '1':
+        useCase1();
+        break;
       case 'r':
         {
           const verification = readline.question(
@@ -120,7 +145,7 @@ Pending requests: [${sys.requests.map((r) => `${r.floor}:${Logger.directionSymbo
   } catch (err) {
     console.log(colors.red(err.message));
   }
-  menu();
+  if (recurse) menu();
 }
 
 menu('i');

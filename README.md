@@ -18,3 +18,4 @@ Write code to implement the following:
 3. A3: Elevator movement management should prioritize serving the current direction of movement.
 4. A4: Elevator movement management should attempt to optimize for quick summon (fewer movements) as long as assumption A3 is upheld.
 5. A5: The system should prioritize passenger experience over potential power savings.
+6. A6: Elevator movement management should account for time needed for passengers to board/disembark.

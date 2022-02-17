@@ -6,7 +6,7 @@ export interface IElevator {
   get currentFloor(): number;
   get travelDirection(): ElevatorTravelDirection;
   get id(): number;
-  tick(): void;
+  tick(): boolean;
   moveCloserToFloor(floor: number): void;
   hold(): void;
 }
@@ -156,34 +156,42 @@ export class Elevator implements IElevator {
     return this._id;
   }
 
+  private _refreshDirection() {
+    const jobs = this._jobs[this._travelDirection];
+    if (this._boardingCountdown === 0 && this._travelDirection !== 'None' && jobs.length === 0) {
+      // update direction
+      const otherDirection = this._travelDirection === 'Up' ? 'Down' : 'Up';
+      if (this._jobs[otherDirection].length === 0) {
+        this._log(`out of jobs`);
+        this._travelDirection = 'None';
+      } else {
+        this._log(`new direction: ${otherDirection}`);
+        this._travelDirection = otherDirection;
+      }
+    }
+  }
+
   /**
    * Take a single step (if needed), a step is the elevator moving one floor up or down.
    */
-  tick(): void {
-    if (this._boardingCountdown > 0) {
-      this._boardingCountdown--;
-      this._log(`waiting for boarding/disembarking, wait time remaining: ${this._boardingCountdown}`);
-      if (this._boardingCountdown === 0 && this._travelDirection !== 'None') {
-        // update direction
-        const otherDirection = this._travelDirection === 'Up' ? 'Down' : 'Up';
-        if (this._jobs[otherDirection].length === 0) {
-          this._log(`out of jobs`);
-          this._travelDirection = 'None';
-        } else {
-          this._log(`new direction: ${otherDirection}`);
-          this._travelDirection = otherDirection;
-        }
-      }
-      return;
-    }
-    if (this._travelDirection === 'None') return;
+  tick(): boolean {
     const jobs = this._jobs[this._travelDirection];
+    if (this._boardingCountdown > 0) {
+      this._log(`waiting for boarding/disembarking, wait time remaining: ${this._boardingCountdown}`);
+      this._boardingCountdown--;
+      this._refreshDirection();
+      return true; // this means an action was taken for this elevator during this tick
+    }
+    if (this._travelDirection === 'None') return false;
+    let didMove = false;
     if (jobs.length > 0) {
       if (this._currentFloor < jobs[0]) {
         this._currentFloor++;
+        didMove = true;
         this._log(`moved up to floor ${this._currentFloor}`);
       } else if (this._currentFloor > jobs[0]) {
         this._currentFloor--;
+        didMove = true;
         this._log(`moved down to floor ${this._currentFloor}`);
       }
       if (this._currentFloor === jobs[0]) {
@@ -197,8 +205,10 @@ export class Elevator implements IElevator {
             ? `no more stops in the current direction (${this._travelDirection})`
             : `next stops in the current direction (${this._travelDirection}): [${jobs.join(', ')}]`;
         this._log(`arrived at floor ${this._currentFloor}, ${nextStops}`);
+        this._refreshDirection();
       }
     }
+    return didMove;
   }
 
   /**
@@ -220,5 +230,6 @@ export class Elevator implements IElevator {
   hold(): void {
     this._boardingCountdown = Elevator.BOARDING_TIME;
     this._log(`hold requested`);
+    this.tick();
   }
 }

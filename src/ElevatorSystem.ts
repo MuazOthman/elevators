@@ -120,9 +120,11 @@ export class ElevatorSystem implements IElevatorSystem {
   tick(ticks = 1): void {
     for (let i = 0; i < ticks; i++) {
       this._time++;
+      const moved: number[] = [];
 
       for (let i = 0; i < this._elevators.length; i++) {
-        this._elevators[i].tick();
+        const didMove = this._elevators[i].tick();
+        if (didMove) moved.push(this._elevators[i].id);
       }
 
       // try to fulfill requests
@@ -140,7 +142,7 @@ export class ElevatorSystem implements IElevatorSystem {
           // ensure that if an elevator is there it stops for the passenger to board
           costs[0].elevator.hold();
         }
-        if (costs[0].elevator.travelDirection === 'None') {
+        if (costs[0].elevator.travelDirection === 'None' && moved.every((m) => m !== costs[0].elevator.id)) {
           /* When the best option (lowest waiting time) is a stationary elevator, move it 1 floor closer to the
            * requested floor. This move is necessary in many cases like the initial request, but can end up being
            * unneeded if a better option presents after a few ticks. The system only uses currently known information
@@ -149,9 +151,14 @@ export class ElevatorSystem implements IElevatorSystem {
            * savings.
            */
           costs[0].elevator.moveCloserToFloor(request.floor);
+          moved.push(costs[0].elevator.id);
         }
       }
-      this._log(`System: current status ${this.currentElevatorFloors.join(' ')}`);
+      this._log(
+        `System: current status ${this.currentElevatorFloors.join(' ')}, requests: [${this._requests
+          .map((r) => `${r.floor}:${Logger.directionSymbol(r.direction)}`)
+          .join(' ')}]`,
+      );
     }
   }
 }
